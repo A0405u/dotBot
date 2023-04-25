@@ -93,7 +93,7 @@ async function fetch(channel) {
 
 function ending(n, endings)
 {
-	if (n > 10 && n < 20)
+	if (n % 100 > 10 && n % 100 < 20)
 		return endings[2];
 	
 	if (n % 10 === 1)
