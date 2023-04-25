@@ -1,5 +1,5 @@
 const { Client, GatewayIntentBits, MessageFlags, cleanCodeBlockContent, ActionRowBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, TextInputStyle } = require('discord.js');
-const { token } = require('./config.json');
+var config = require('./config.json')
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
@@ -12,11 +12,11 @@ var rejected
 client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
 
-	bot = client.channels.cache.get("1031331325690519632");
-	main = client.channels.cache.get("1012248164025241660");
-	posted = client.channels.cache.get("1031250969960398901");
-	accepted = client.channels.cache.get("1031250921264525362");
-	rejected = client.channels.cache.get("1031251015804129310");
+	bot = client.channels.cache.get(config.channel.bot);
+	main = client.channels.cache.get(config.channel.main);
+	posted = client.channels.cache.get(config.channel.posted);
+	accepted = client.channels.cache.get(config.channel.accepted);
+	rejected = client.channels.cache.get(config.channel.rejected);
 
 	//test(main);
 });
@@ -52,7 +52,7 @@ client.on('interactionCreate', async interaction => {
 	}
 });
 
-client.login(token);
+client.login(config.token);
 
 async function test(channel){
 
