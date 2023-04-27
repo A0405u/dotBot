@@ -74,7 +74,7 @@ client.on('messageCreate', async (message) => {
 
 			let $ = cheerio.load(await response.text());
 			let image = "https://pixeljoint.com/" + $("#mainimg").attr("src")
-			let description = $("[alt=user]").parent().parent().next().find('a').first().parent().parent().next().next().next().next().text();
+			let description = $("[alt=user]").parent().parent().next().find('a').first().parent().parent().parent().children().last().text();
 			let name = $("[alt=user]").parent().parent().next().find('a').first().text();
 			let authorURL = "https://pixeljoint.com/"+ $("[alt=user]").parent().attr("href");
 			let iconURL = "https://pixeljoint.com/"+ $("[alt=user]").attr('src');
