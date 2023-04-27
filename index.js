@@ -1,7 +1,9 @@
 const { Client, GatewayIntentBits, MessageFlags, cleanCodeBlockContent, ActionRowBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, TextInputStyle } = require('discord.js');
-var config = require('./config.json')
+const { token, channel } = require('./config.json')
+var nodefetch = require('node-fetch');
+const cheerio = require('cheerio');
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
 var bot
 var main
@@ -9,18 +11,20 @@ var posted
 var accepted
 var rejected
 
+// On bot start
 client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
 
-	bot = client.channels.cache.get(config.channel.bot);
-	main = client.channels.cache.get(config.channel.main);
-	posted = client.channels.cache.get(config.channel.posted);
-	accepted = client.channels.cache.get(config.channel.accepted);
-	rejected = client.channels.cache.get(config.channel.rejected);
+	bot = client.channels.cache.get(channel.bot);
+	main = client.channels.cache.get(channel.main);
+	posted = client.channels.cache.get(channel.posted);
+	accepted = client.channels.cache.get(channel.accepted);
+	rejected = client.channels.cache.get(channel.rejected);
 
 	//test(main);
 });
 
+// On interaction with the bot
 client.on('interactionCreate', async interaction => { 
 	if (!interaction.isChatInputCommand()) return;
 
@@ -52,8 +56,75 @@ client.on('interactionCreate', async interaction => {
 	}
 });
 
-client.login(config.token);
+client.on('messageCreate', async (message) => {
 
+	if (message.channel.id === channel.main) {
+		if (message.content.includes("pixeljoint.com") && !message.author.bot){
+
+			await delay(5000);
+
+			if(message.embeds.length < 1)
+				return;
+
+			let embed = message.embeds[0];
+			const response = await nodefetch(embed.url);
+
+			if (response.status != 200)
+				return
+
+			let $ = cheerio.load(await response.text());
+			let image = "https://pixeljoint.com/" + $("#mainimg").attr("src")
+			let description = $("[alt=user]").parent().parent().next().find('a').first().parent().parent().next().next().next().next().text();
+			let name = $("[alt=user]").parent().parent().next().find('a').first().text();
+			let authorURL = "https://pixeljoint.com/"+ $("[alt=user]").parent().attr("href");
+			let iconURL = "https://pixeljoint.com/"+ $("[alt=user]").attr('src');
+
+			let fixedEmbed = new EmbedBuilder()
+				// .setURL(embed.url)
+				.setTitle($("title").text().slice(0, -16))
+				.setAuthor({name: name, iconURL: iconURL, url: authorURL})
+				.setImage(image)
+				.setDescription(description)
+				
+			let newMessage = {}
+
+			if (message.content)
+				newMessage.content = message.content;
+			
+			if (message.components)
+				newMessage.components = message.components;
+			
+			if (message.attachments)
+				newMessage.files = message.attachments;
+			
+			newMessage.embeds = [fixedEmbed];
+			
+			if (newMessage === {})
+				return;
+
+			message.channel.send(newMessage);
+			message.delete();
+			// message.suppressEmbeds();
+			// console.log("Embed suppressed!");
+		}
+	}
+   })
+
+// client.on('messageUpdate', async (message) => {
+
+// 	console.log("Message Updated!")
+
+// 	if (message.channel.id === channel.main) {
+// 		for (embed in message.embeds){
+// 			console.log(embed);
+// 		}
+// 	}
+// })
+
+// Bot login
+client.login(token);
+
+// Test function
 async function test(channel){
 
 	let message = await channel.messages.fetch({ limit: 1 })
@@ -67,6 +138,8 @@ async function test(channel){
 	})
 }
 
+// Get all messages from channel
+// Returns array of messages
 async function fetch(channel) {
 	
 	let messages = [];
@@ -91,6 +164,9 @@ async function fetch(channel) {
 	return messages
 }
 
+// Set ending for counting numerals
+// n - number, ending - array of possible endings
+// Returns one of the endings
 function ending(n, endings)
 {
 	if (n % 100 > 10 && n % 100 < 20)
@@ -105,11 +181,14 @@ function ending(n, endings)
 	return endings[2];
 }
 
+// Count messages in channel
+// Returns number of messages
 async function count(channel)
 {
 	return (await fetch(channel)).length;
 }
 
+// Returns statiscins in all channels
 async function stats(){
 
 	a = await count(accepted);
@@ -123,6 +202,11 @@ async function stats(){
 	);
 }
 
+function delay(time) {
+	return new Promise(resolve => setTimeout(resolve, time));
+  } 
+
+// Sorts messages in channel
 async function sort(channel){
 
 	let messages = await fetch(channel)
@@ -160,6 +244,7 @@ async function sort(channel){
 		console.log(`No messages to sort in ${channel.name}!`)
 }
 
+// Moves all messages from channel to destination
 async function moveAll(channel, destination){
 
 	messages = await fetch(channel)
@@ -173,6 +258,8 @@ async function moveAll(channel, destination){
 		console.log(`No messages to move in ${channel.name}`);
 }
 
+// Move message to channel
+// source - message, destination - channel
 async function move(source, destination){
 
 	let content = source.content;
@@ -189,6 +276,9 @@ async function move(source, destination){
 	
 	if (attachments)
 		message.files = attachments;
+
+	if (source.embeds.length > 0)
+		message.embeds = source.embeds;
 	
 	if (message === {})
 		return;
@@ -198,6 +288,9 @@ async function move(source, destination){
 		.catch(console.error);
 }
 
+// Get attachements in message
+// source - message
+// Returns attachments in array
 function getAttachments(source)
 {
 	if (source.attachments.size > 0)
@@ -210,6 +303,9 @@ function getAttachments(source)
 	return null;
 }
 
+// Create reaction bar of previous reactions
+// source - message, filter - excluded reactions
+// Returns ActionRow
 function createReactionBar(source, filter = ['🥝', '✅', '❌'])
 {
 
@@ -241,6 +337,7 @@ function createReactionBar(source, filter = ['🥝', '✅', '❌'])
 	return null;
 }
 
+// Returns emoji id
 function getEmoji(emoji)
 {
 	if (emoji.id != null)
@@ -249,6 +346,8 @@ function getEmoji(emoji)
 	return emoji.name;
 }
 
+// Cleans channel of certain message types
+// Message types: https://discord.com/developers/docs/resources/channel#message-object-message-types
 async function clean(channel){
 
 	messages = await fetch(channel)
