@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, MessageFlags, cleanCodeBlockContent, ActionRowBuilder, AttachmentBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, TextInputStyle } = require('discord.js');
+const { Client, Events, GatewayIntentBits, MessageFlags, cleanCodeBlockContent, ActionRowBuilder, AttachmentBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, TextInputStyle, Partials } = require('discord.js');
 const { token, channel } = require('./config.json')
 const os = require('os');
 const fs = require('fs');
@@ -17,13 +17,13 @@ console.log("Initialized temporary dir at path: \n" + TMP_DIR);
 
 const IMG_SCALE = 4;
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
+const client = new Client({ 
+	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMessageReactions],
+	partials: [Partials.Message, Partials.Channel, Partials.Reaction]
+});
 
-var bot
-var main
-var posted
-var accepted
-var rejected
+var bot, main, posted, accepted, rejected
+var channels = [channel.main, channel.posted, channel.accepted, channel.rejected]
 
 // On bot start
 client.once('ready', () => {
@@ -96,9 +96,36 @@ client.on('messageCreate', async (message) => {
 	}
 })
 
-client.on('messageReactionAdd', async (reaction, user) => {
+client.on(Events.MessageReactionAdd, async (reaction, user) => {
 
-	console.log(reaction, user)
+	if (reaction.partial) {
+		try {
+			await reaction.fetch();
+		} catch (error) {
+			console.error('Something went wrong when fetching the message:', error);
+			return;
+		}
+	}
+
+	let message = reaction.message;
+
+	if (!channels.includes(message.channel.id))
+		return;
+
+	if (reaction.emoji.name === '🥝'){
+		await move(reaction.message, posted);
+		return;
+	}
+
+	if (reaction.emoji.name === '✅'){
+		await move(reaction.message, accepted);
+		return;
+	}
+
+	if (reaction.emoji.name === '❌'){
+		await move(reaction.message, rejected);
+		return;
+	}
 })
 
 // client.on('messageUpdate', async (message) => {
@@ -119,7 +146,7 @@ function hasLink(message, source)
 {
 	let urls = extractUrls(message.content);
 
-	if (urls[0].includes(source))
+	if (urls && urls.length > 0 && urls[0].includes(source))
 		return true;
 
 	return false;
