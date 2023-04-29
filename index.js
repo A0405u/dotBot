@@ -1,8 +1,21 @@
-const { Client, GatewayIntentBits, MessageFlags, cleanCodeBlockContent, ActionRowBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, TextInputStyle } = require('discord.js');
+const { Client, GatewayIntentBits, MessageFlags, cleanCodeBlockContent, ActionRowBuilder, AttachmentBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, TextInputStyle } = require('discord.js');
 const { token, channel } = require('./config.json')
+const os = require('os');
+const fs = require('fs');
+const path = require('path');
 const nodefetch = require('node-fetch');
 const cheerio = require('cheerio');
 const moment = require('moment');
+const extractUrls = require('extract-urls');
+const sharp = require('sharp');
+
+const TMP_DIR = os.tmpdir() + path.sep + 'dotbot' + path.sep;
+const IMG_DIR = TMP_DIR + 'images' + path.sep;
+
+fs.mkdirSync(IMG_DIR, { recursive: true });
+console.log("Initialized temporary dir at path: \n" + TMP_DIR);
+
+const IMG_SCALE = 4;
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
@@ -61,22 +74,16 @@ client.on('messageCreate', async (message) => {
 
 	if (message.channel.id === channel.main) {
 
-		if (message.content.includes("pixeljoint.com") && !message.author.bot){
+		let urls = extractUrls(message.content);
 
-			await delay(5000); // wait for embed to generate
+		if (urls[0].includes("pixeljoint.com") && !message.author.bot){
 
-			if(!message.embeds || message.embeds.length == 0)
-				return;
-
-			let embed = message.embeds[0];
-			const response = await nodefetch(embed.url);
+			const response = await nodefetch(urls[0]);
 
 			if (response.status != 200)
 				return
 				
-			let newMessage = copy(message)
-			
-			newMessage.embeds = [generatePJEmbed(await response.text())];
+			let newMessage = await generatePJEmbededMessage(message, await response.text());
 
 			message.channel.send(newMessage);
 			message.delete();
@@ -100,24 +107,67 @@ client.on('messageCreate', async (message) => {
 // Bot login
 client.login(token);
 
-function generatePJEmbed(page)
+async function generatePJEmbededMessage(source, page)
 {
+	let message = copy(source);
+
 	let $ = cheerio.load(page);
-	let image = "https://pixeljoint.com" + $("#mainimg").attr("src")
-	let description = $("[alt=user]").parent().parent().next().find('a').first().parent().parent().parent().children().last().text();
-	let name = $("[alt=user]").parent().parent().next().find('a').first().text();
+	let title = $("title").text().slice(0, -17);
+	let imageName = $("#mainimg").attr("src").substring(18);
+	let imageURL = "https://pixeljoint.com" + $("#mainimg").attr("src")
+	let description = $('[alt=user]').closest('tr').find('tbody').children().last().text();
+	let likes = $('.fa-heart').parent().text().split(/\s/)[1];
+	let comments = $('.fa-comment').parent().text().split(/\s/)[1];
+	let authorName = $("[alt=user]").closest('td').next().find('a').first().text();
+	// let authorName = $("[alt=user]").closest('tr').find('a').text();
 	let authorURL = "https://pixeljoint.com"+ $("[alt=user]").parent().attr("href");
 	let iconURL = "https://pixeljoint.com"+ $("[alt=user]").attr('src');
 	let date = moment($("[alt=user]").parent().parent().next().find('a').first().parent().parent().parent().children().first().next().next().children().last().text(), "MM/DD/YYYY HH:mm").toDate();
 
-	return new EmbedBuilder()
+	const image = await scaleImage(imageURL);
+	
+	if (image){
+		message.files = [image];
+		imageURL = 'attachment://' + imageName;
+	}
+
+	if (description.includes("Statistics:")){
+		description = null;
+	}
+
+	let embed = new EmbedBuilder()
 		// .setURL(embed.url)
-		.setTitle($("title").text().slice(0, -16))
-		.setAuthor({name: name, iconURL: iconURL, url: authorURL})
-		.setImage(image)
+		.setTitle(title)
+		.setAuthor({name: authorName, iconURL: iconURL, url: authorURL})
+		.setImage(imageURL)
 		.setDescription(description)
+		// .addFields({ name: 'Likes', value: likes, inline: true }, { name: 'Comments', value: comments, inline: true })
 		.setFooter({text: "Pixel Joint", iconURL: "https://pixeljoint.com/favicon-96x96.png"})
 		.setTimestamp(date)
+		.setColor("73d731")
+	
+	message.embeds = [embed];
+
+	return message;
+}
+
+async function scaleImage(imageURL)
+{
+	const imageName = path.basename(imageURL);
+
+	const response = await nodefetch(imageURL);
+	
+	if (response.status != 200)
+		return null;
+
+	const image = await sharp(await response.arrayBuffer());
+	const metadata = await image.metadata();
+
+	await image.resize(metadata.width * IMG_SCALE, metadata.height * IMG_SCALE, { kernel: sharp.kernel.nearest }).toFile(IMG_DIR + imageName);
+	
+	const file = new AttachmentBuilder(IMG_DIR + imageName, { name: imageName});
+
+	return file
 }
 
 // Copy message
