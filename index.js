@@ -76,6 +76,9 @@ client.on('messageCreate', async (message) => {
 
 		let urls = extractUrls(message.content);
 
+		if (!urls || urls.length == 0)
+			return;
+
 		if (urls[0].includes('pixeljoint.com') && !message.author.bot){
 
 			const response = await nodefetch(urls[0]);
@@ -91,7 +94,12 @@ client.on('messageCreate', async (message) => {
 			// console.log("Embed suppressed!");
 		}
 	}
-   })
+})
+
+client.on('messageReactionAdd', async (reaction, user) => {
+
+	console.log(reaction, user)
+})
 
 // client.on('messageUpdate', async (message) => {
 
