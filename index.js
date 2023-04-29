@@ -76,7 +76,7 @@ client.on('messageCreate', async (message) => {
 
 		let urls = extractUrls(message.content);
 
-		if (urls[0].includes("pixeljoint.com") && !message.author.bot){
+		if (urls[0].includes('pixeljoint.com') && !message.author.bot){
 
 			const response = await nodefetch(urls[0]);
 
@@ -106,6 +106,16 @@ client.on('messageCreate', async (message) => {
 
 // Bot login
 client.login(token);
+
+function hasLink(message, source)
+{
+	let urls = extractUrls(message.content);
+
+	if (urls[0].includes(source))
+		return true;
+
+	return false;
+}
 
 async function generatePJEmbededMessage(source, page)
 {
@@ -343,7 +353,7 @@ async function move(source, destination){
 	if (attachments)
 		message.files = attachments;
 
-	if (source.embeds.length > 0)
+	if (hasLink(message, 'pixeljoint.com') && source.embeds.length > 0)
 		message.embeds = source.embeds;
 	
 	if (message === {})
