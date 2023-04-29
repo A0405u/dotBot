@@ -4,4 +4,6 @@ Dependencies:
     node-fetch@2
     cheerio
     moment
+    extract-urls
+    sharp
 ```
