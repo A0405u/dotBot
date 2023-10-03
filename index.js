@@ -144,6 +144,9 @@ client.login(token);
 
 function hasLink(message, source)
 {
+	if (!message.content)
+		return false;
+
 	let urls = extractUrls(message.content);
 
 	if (urls && urls.length > 0 && urls[0].includes(source))
@@ -391,7 +394,7 @@ async function move(source, destination){
 	if (hasLink(message, 'pixeljoint.com') && source.embeds.length > 0)
 		message.embeds = source.embeds;
 	
-	if (message === {})
+	if (message == {})
 		return;
 	
 	destination.send(message)
