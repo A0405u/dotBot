@@ -74,14 +74,11 @@ client.on('messageCreate', async (message) => {
 
 	if (message.channel.id === channel.main) {
 
-		let urls = extractUrls(message.content);
+		let url = findUrl(message, "pixeljoint.com");
 
-		if (!urls || urls.length == 0)
-			return;
+		if (url && !message.author.bot) {
 
-		if (urls[0].includes('pixeljoint.com') && !message.author.bot){
-
-			const response = await nodefetch(urls[0]);
+			const response = await nodefetch(url);
 
 			if (response.status != 200)
 				return
@@ -142,15 +139,20 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 // Bot login
 client.login(token);
 
-function hasLink(message, source)
+function findUrl(message, source)
 {
 	if (!message.content)
 		return false;
 
 	let urls = extractUrls(message.content);
 
-	if (urls && urls.length > 0 && urls[0].includes(source))
-		return true;
+	if (!urls || urls.length == 0)
+		return null;
+	
+	for (let url of urls) {
+		if (url.includes(source))
+			return url;
+	}
 
 	return false;
 }
@@ -391,8 +393,19 @@ async function move(source, destination){
 	if (attachments)
 		message.files = attachments;
 
-	if (hasLink(message, 'pixeljoint.com') && source.embeds.length > 0)
-		message.embeds = source.embeds;
+	if (source.embeds && source.embeds.length > 0) {
+
+		let url = findUrl(source, "pixeljoint.com");
+
+		if (url) {
+			const response = await nodefetch(url);
+
+			if (response.status == 200)
+				message = await generatePJEmbededMessage(message, await response.text());
+		}
+		else
+			message.embeds = source.embeds;
+	}
 	
 	if (message == {})
 		return;
